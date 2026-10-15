@@ -1,0 +1,95 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>龙岩二中 · 教室 Demo</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:sans-serif}
+#hud{position:fixed;left:12px;top:10px;color:#ffe9c4;text-shadow:0 1px 3px #000;font-size:14px;line-height:1.6;pointer-events:none}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(255,200,120,0.07) 40%,rgba(40,15,0,0.55) 100%);mix-blend-mode:multiply}
+#msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(0,0,0,.45);text-align:center;cursor:pointer}
+#cross{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px;pointer-events:none;z-index:5}
+#cross:before,#cross:after{content:'';position:absolute;background:#fff;box-shadow:0 0 0 1px #000a}
+#cross:before{left:12px;top:0;width:2px;height:26px;-webkit-mask:linear-gradient(#000 0 9px,transparent 9px 17px,#000 17px);mask:linear-gradient(#000 0 9px,transparent 9px 17px,#000 17px)}
+#cross:after{top:12px;left:0;height:2px;width:26px;-webkit-mask:linear-gradient(90deg,#000 0 9px,transparent 9px 17px,#000 17px);mask:linear-gradient(90deg,#000 0 9px,transparent 9px 17px,#000 17px)}
+#tip{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-size:15px;pointer-events:none;transition:opacity .6s}
+#mode{position:fixed;right:12px;top:10px;color:#ffe9c4;text-shadow:0 1px 3px #000;font-size:14px;pointer-events:none}</style></head><body>
+<div id="vig"></div><div id="cross"></div>
+<div id="hud">WASD/↑↓ 移动 · 鼠标(或←→/按住拖动) 转视角 · V 切换第一/第三人称 · J 弹弓 · K 水枪 · L 粉笔 · Shift 跑<br><span id="st">加载中…</span></div>
+<div id="tip">移动鼠标转动视角（若无反应：按住鼠标左键拖动，或用 ← → 方向键）</div><div id="mode"></div>
+<div id="msg">点击开始（鼠标将被锁定用来转视角，Esc 退出）<br><small>(加载教室模型中，请稍等)</small></div>
+<script type="module">
+import * as THREE from './lib/three.module.js';
+import {GLTFLoader} from './lib/GLTFLoader.js';
+import {MeshoptDecoder} from './lib/meshopt_decoder.module.js';
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xf3c98f);scene.fog=new THREE.Fog(0xe8c28c,14,40);
+const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,80);
+scene.add(new THREE.HemisphereLight(0xffe2b0,0x8a6a4a,1.0));
+const EYE=1.35;
+const player={p:new THREE.Vector3(-0.3,0,-5.5),yaw:Math.PI,pitch:0,tp:false};
+const B={x0:-5.0,x1:4.5,z0:-6.7,z1:-0.6};
+function makeKid(top,bottom,skin,band){const g=new THREE.Group();const m=(c)=>new THREE.MeshLambertMaterial({color:c});
+ const body=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.55,16),m(top));body.position.y=.82;
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.14,16,12),m(skin));head.position.y=1.24;
+ const hair=new THREE.Mesh(new THREE.SphereGeometry(.145,16,8,0,Math.PI*2,0,Math.PI*.55),m(0x111111));hair.position.y=1.255;
+ const legs=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.55,12),m(bottom));legs.position.y=.28;
+ const bd=new THREE.Mesh(new THREE.BoxGeometry(.34,.06,.2),m(band));bd.position.set(0,1.05,0);
+ g.add(body,head,hair,legs,bd);return g;}
+const kid=makeKid(0xc9d0e0,0x26337a,0xe6b894,0xd33);scene.add(kid);
+const npcs=[[ -2.6,-3.4,0.6,0xe8e8e8,0x222a55,0xdcae8a,0xd33],[1.8,-2.6,-2.4,0xc9d0e0,0x333333,0xe6b894,0xd33],[-3.8,-5.2,1.4,0xf0e0c0,0x26337a,0xe0b090,0x2a7],[2.9,-4.6,-1.0,0xdddddd,0x1d2a60,0xe6b894,0xd33]]
+ .map(([x,z,ry,t,b,sk,bn])=>{const k=makeKid(t,b,sk,bn);k.position.set(x,0,z);k.rotation.y=ry;k.userData.base=ry;k.userData.ph=Math.random()*6;scene.add(k);return k;});
+const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);
+loader.load('room.glb',g=>{const r=g.scene;r.traverse(o=>{if(o.isMesh){o.material.color&&o.material.color.setRGB(1.12,0.98,0.82);o.frustumCulled=false;}});scene.add(r);
+ document.getElementById('st').textContent='就绪';document.querySelector('#msg small').textContent='WASD + 鼠标 · V 切换视角 · J/K/L 武器';},undefined,e=>{document.getElementById('st').textContent='模型加载失败: '+e;});
+// input
+const keys={};addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyV'){player.tp=!player.tp;}
+ if(e.code==='KeyJ')fire('J');if(e.code==='KeyK')fire('K');if(e.code==='KeyL')fire('L');});
+addEventListener('keyup',e=>keys[e.code]=false);
+const msg=document.getElementById('msg'),tip=document.getElementById('tip'),modeEl=document.getElementById('mode');
+let started=false,dragging=false,lockFailed=false,SENS=0.0026;
+const cv=renderer.domElement;
+function look(dx,dy){player.yaw-=dx*SENS;player.pitch=Math.max(-1.3,Math.min(1.3,player.pitch-dy*SENS));if(tip)tip.style.opacity=0;}
+function updMode(){modeEl.textContent=document.pointerLockElement?'鼠标已锁定 · Esc 释放':(started?'拖动鼠标左键转视角':'');}
+msg.onclick=()=>{started=true;msg.style.display='none';try{const p=cv.requestPointerLock();if(p&&p.catch)p.catch(()=>{lockFailed=true;updMode();});}catch(e){lockFailed=true;}updMode();};
+document.addEventListener('pointerlockchange',()=>{updMode();});
+document.addEventListener('pointerlockerror',()=>{lockFailed=true;updMode();});
+document.addEventListener('mousemove',e=>{
+ if(document.pointerLockElement){look(e.movementX,e.movementY);}
+ else if(started&&dragging){look(e.movementX,e.movementY);}});
+cv.addEventListener('mousedown',e=>{if(!started)return;if(e.button===0){dragging=true;if(!document.pointerLockElement&&!lockFailed){try{cv.requestPointerLock();}catch(_){}}}});
+addEventListener('mouseup',()=>dragging=false);
+// touch: drag to look
+let tl=null;cv.addEventListener('touchstart',e=>{started=true;msg.style.display='none';tl=e.touches[0];},{passive:true});
+cv.addEventListener('touchmove',e=>{const t=e.touches[0];if(tl){look((t.clientX-tl.clientX)*1.3,(t.clientY-tl.clientY)*1.3);tl=t;}},{passive:true});
+cv.addEventListener('touchend',()=>tl=null);
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+// projectiles
+const proj=[];const geoS=new THREE.SphereGeometry(1,8,6);
+const mats={J:new THREE.MeshLambertMaterial({color:0x6b5a48}),K:new THREE.MeshBasicMaterial({color:0x66b8ff,transparent:true,opacity:.8}),L:new THREE.MeshLambertMaterial({color:0xffffff})};
+function dir(){const d=new THREE.Vector3(0,0,-1);d.applyEuler(new THREE.Euler(player.pitch,player.yaw,0,'YXZ'));return d;}
+function fire(t){const d=dir();const o=player.p.clone();o.y+=EYE-0.1;o.addScaledVector(d,0.5);
+ const add=(m,pos,vel,life,grav)=>{scene.add(m);m.position.copy(pos);proj.push({m,v:vel,life,g:grav,t});};
+ if(t==='J'){const m=new THREE.Mesh(geoS,mats.J);m.scale.setScalar(.025);add(m,o,d.clone().multiplyScalar(26),4,9.8);}
+ if(t==='K'){for(let i=0;i<10;i++){const m=new THREE.Mesh(geoS,mats.K);m.scale.setScalar(.02);const v=d.clone().multiplyScalar(11).add(new THREE.Vector3((Math.random()-.5)*1.2,(Math.random()-.5)*1.2,(Math.random()-.5)*1.2));add(m,o,v,2.5,9.8);}}
+ if(t==='L'){const m=new THREE.Mesh(new THREE.BoxGeometry(.01,.01,.08),mats.L);add(m,o,d.clone().multiplyScalar(15),4,9.8);}
+}
+function splash(p,t){const n=t==='K'?4:t==='L'?6:3;for(let i=0;i<n;i++){const m=new THREE.Mesh(geoS,t==='L'?mats.L:t==='K'?mats.K:mats.J);m.scale.setScalar(.012);scene.add(m);m.position.copy(p);
+ proj.push({m,v:new THREE.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*2),life:.6,g:9.8,t,fx:true});}}
+const clock=new THREE.Clock();let T0=0;
+function tick(){requestAnimationFrame(tick);const dt=Math.min(clock.getDelta(),.05);
+ const sp=(keys.ShiftLeft?4:2.2)*dt;const f=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw)),r=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
+ const mv=new THREE.Vector3();if(keys.KeyW||keys.ArrowUp)mv.add(f);if(keys.KeyS||keys.ArrowDown)mv.sub(f);if(keys.KeyD)mv.add(r);if(keys.KeyA)mv.sub(r);
+ if(keys.ArrowLeft)player.yaw+=1.8*dt;if(keys.ArrowRight)player.yaw-=1.8*dt;
+ if(mv.lengthSq())player.p.addScaledVector(mv.normalize(),sp);
+ player.p.x=Math.max(B.x0,Math.min(B.x1,player.p.x));player.p.z=Math.max(B.z0,Math.min(B.z1,player.p.z));
+ const bob=mv.lengthSq()?Math.sin(performance.now()*.01)*.012:0;
+ kid.position.copy(player.p);kid.rotation.y=player.yaw;kid.visible=player.tp;
+ const eye=player.p.clone();eye.y=EYE+bob;
+ if(!player.tp){cam.position.copy(eye);}
+ else{const back=new THREE.Vector3(0,0,1).applyEuler(new THREE.Euler(-player.pitch*.8,player.yaw,0,'YXZ'));cam.position.copy(eye).addScaledVector(back,2.4);cam.position.y+=0.5;
+  cam.position.x=Math.max(-5.4,Math.min(4.9,cam.position.x));cam.position.z=Math.max(-7.1,Math.min(-0.2,cam.position.z));}
+ if(!player.tp)cam.rotation.set(player.pitch,player.yaw,0,'YXZ');else cam.lookAt(player.p.x,1.15,player.p.z);
+ for(let i=proj.length-1;i>=0;i--){const q=proj[i];q.v.y-=q.g*dt;q.m.position.addScaledVector(q.v,dt);if(q.t==='L'&&!q.fx)q.m.rotation.x+=10*dt;q.life-=dt;
+  const p=q.m.position;let hit=false;if(!q.fx){if(p.y<0.02||p.x<-5.6||p.x>5.2||p.z<-7.3||p.z>-0.1||p.y>4.3)hit=true;}
+  if(q.life<=0||hit||(q.fx&&p.y<0)){if(hit)splash(p.clone().setY(Math.max(p.y,.02)),q.t);scene.remove(q.m);proj.splice(i,1);}}
+ T0+=dt;for(const k of npcs){k.rotation.y=k.userData.base+Math.sin(T0*.8+k.userData.ph)*.15;k.position.y=Math.abs(Math.sin(T0*1.6+k.userData.ph))*.01;}
+ renderer.render(scene,cam);}
+tick();
+</script></body></html>
